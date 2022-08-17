@@ -76,45 +76,35 @@ export function start(path: string, win: BrowserWindow | null, app: App) {
                             })
                             /** 视频的帧数 */
                             let fps = '0'
+
+                            /** 视频的持续时间 */
                             let duration = '0'
-                            // shell.exec(
-                            //     `ffmpeg -i "${inputFileFullPath}"`,
-                            //     /**
-                            //      *
-                            //      * @param _code    返回的状态码，`0`为成功
-                            //      * @param _s
-                            //      * @param message  控制台输出的信息
-                            //      */
-                            //     (_code, _s, message) => {
-                            //         /** 匹配fps */
-                            //         const result = message.match(/\w{2}\.?\w{0,2}(?= fps)/)
-                            //         fps = (result && result[0]) || '29.97'
-                            //         console.log(message)
 
-                            //         duration = message.match(/(?<=Duration: ).+(?=,)/)![0]
-                            //     }
-                            // )
                             try {
-                                const result = shell.execSync(`ffmpeg -i "${inputFileFullPath}"`)
+                                shell.execSync(`ffmpeg -i "${inputFileFullPath}"`)
                             } catch (err: any) {
+                                /** 终端输出的信息 */
                                 const message = err.toString()
-                                // console.log(fps, duration)
 
+                                /** 匹配到的fps的信息 */
                                 const fpsResult = message.match(/\w{2}\.?\w{0,2}(?= fps)/)
+
+                                //匹配到则赋值
                                 fps = fpsResult && fpsResult[0]
 
+                                /** 匹配视频持续时间的信息 */
                                 const durationResult = message.match(/(?<=Duration: ).+(?=, start)/)
+
+                                //匹配到则赋值
                                 duration = durationResult && durationResult[0]
-                                // console.log(fps, duration)
                             }
                             if (fps === '0' || duration === '0') {
                                 console.log('fps, duration解析错误')
                                 return
                             }
-                            // console.log(iconv.decode(file, 'gbk'))
                             console.log(file)
 
-                            /** 开始转视频 */
+                            // 开始转视频
                             Mp4ToImageTo4KToMp4(
                                 img_temp_floder,
                                 input,

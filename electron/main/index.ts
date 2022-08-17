@@ -2,8 +2,6 @@ import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { release } from 'os'
 import { join } from 'path'
 import { init } from '../script'
-// Disable GPU Acceleration for Windows 7
-import { killQueue } from '../script/killQueue'
 
 if (release().startsWith('6.1')) app.disableHardwareAcceleration()
 

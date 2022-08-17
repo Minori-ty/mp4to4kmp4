@@ -23,3 +23,8 @@ dist-ssr
 
 release
 .vscode/.debug.env
+
+input
+output
+img_temp
+img_out

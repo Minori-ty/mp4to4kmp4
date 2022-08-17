@@ -32,44 +32,60 @@ import { reactive, ref, watch } from 'vue'
 import { ipcRenderer } from 'electron'
 import { ElMessageBox } from 'element-plus'
 
+/** 视频转图片的数组 */
 const mp4ToImage = reactive<Item[]>([])
-const ImageTo4K = reactive<Item[]>([])
-const ImageToMp4 = reactive<Item[]>([])
-const path = ref('')
-const error = ref(false)
 
+/** 图片转4K图片的数组 */
+const ImageTo4K = reactive<Item[]>([])
+
+/** 4K图片转4K视频的数组 */
+const ImageToMp4 = reactive<Item[]>([])
+
+/** 后端选择的文件夹路径 */
+const path = ref('')
+
+/** 开始选择文件夹 */
 function select() {
     ipcRenderer.send('selected')
 }
 
+// 接收到后端的回复后，把新的文件夹的路径赋值
+ipcRenderer.on('reply', (_event, data: string[]) => {
+    console.log(data)
+    // 后端把选择到的路径赋值
+    path.value = data[0]
+})
+
+/** 开始转换视频 */
 function start() {
+    // 如果路径存在，则开始转视频
     if (!path.value) {
         return ElMessageBox.alert('请选择目录', 'Title', {
             confirmButtonText: 'OK',
         })
     } else {
+        // 开始转视频
         ipcRenderer.send('start')
-        error.value = false
     }
 }
 
-ipcRenderer.on('reply', (event, data: string[]) => {
-    console.log(data)
-    path.value = data[0]
-})
-
+// 将需要转的文件存到任务数组中
 ipcRenderer.on('file', (event, data: Item) => {
     console.log(data)
     if (!mp4ToImage.some((item) => item.filename == data.filename)) {
         mp4ToImage.push(data)
     }
 })
+
+// 将需要转的文件存到任务数组中
 ipcRenderer.on('file-4K', (event, data: Item) => {
     console.log(data)
     if (!ImageTo4K.some((item) => item.filename == data.filename)) {
         ImageTo4K.push(data)
     }
 })
+
+// 将需要转的文件存到任务数组中
 ipcRenderer.on('file-mp4', (event, data: Item) => {
     console.log(data)
     if (!ImageToMp4.some((item) => item.filename == data.filename)) {
@@ -77,45 +93,34 @@ ipcRenderer.on('file-mp4', (event, data: Item) => {
     }
 })
 
+// 接收视频转图片的完成百分比
 ipcRenderer.on('precent', (event, data: Item) => {
     console.log(data)
     mp4ToImage.forEach((item) => {
         if (item.filename == data.filename) item.precent = data.precent
     })
 })
+
+// 接收图片转4K图片的完成百分比
 ipcRenderer.on('precent-4K', (event, data: Item) => {
     console.log(data)
     ImageTo4K.forEach((item) => {
         if (item.filename == data.filename) item.precent = data.precent
     })
 })
+
+// 接收4K图片转4K视频的完成百分比
 ipcRenderer.on('precent-mp4', (event, data: Item) => {
     console.log(data)
     ImageToMp4.forEach((item) => {
         if (item.filename == data.filename) item.precent = data.precent
     })
 })
-ipcRenderer.on('error', (event, data: string) => {
-    error.value = true
-    console.log(data)
-})
+
 interface Item {
     filename: string
     precent: number
 }
-
-watch(
-    () => error.value,
-    (newValue, oldValue) => {
-        console.log(newValue, oldValue)
-
-        if (newValue) {
-            ElMessageBox.alert('目标路径没有视频，请选择正确的路径', 'Title', {
-                confirmButtonText: 'OK',
-            })
-        }
-    }
-)
 </script>
 
 <style scoped>
