@@ -2,11 +2,9 @@ import shell from 'child_process'
 import fs from 'fs'
 import { formatTime } from './formatTime'
 import type { IAnswers, IModel } from '../types/type.d'
-import colors from 'picocolors'
 import chalk from 'chalk'
 import { BrowserWindow, App, ipcMain } from 'electron'
 import { throttle } from './throttle'
-import { killQueue } from './killQueue'
 const start = chalk.hex('#f4f430')
 /**
  * 视频转图片转4K转视频
@@ -31,18 +29,19 @@ export function Mp4ToImageTo4KToMp4(
     win: BrowserWindow | null,
     app: App
 ) {
-    /** 如果视频已经转图片了，则不用再转了 */
-
+    /** 图片总数 */
     const total = formatTime(duration) * Number(fps)
-
+    // 如果img_temp的子文件都是空的，则开始将视频转临时图片
     if (fs.readdirSync(img_temp_floder).length === 0) {
         console.log(start('开始视频转临时图片'))
         win?.webContents.send('file', { filename: file, precent: 0 })
+
+        // 视频转图片的bash命令
         const result = shell.exec(
             `ffmpeg -i "${input}/${file}" -qscale:v 1 -qmin 1 -qmax 1 -vsync 0 "${img_temp_floder}/frame%08d.png"`,
             () => {
                 console.log(start('\n开始图片转4K图片'))
-
+                // 任务完成后，开始转4K图片
                 ImageTo4kToMp4(
                     img_out_floder,
                     img_temp_floder,
@@ -57,19 +56,23 @@ export function Mp4ToImageTo4KToMp4(
                 )
             }
         )
-        killQueue.push(result)
+        // 软件关闭时，结束所有子进程
         app.on('window-all-closed', () => {
             shell.exec(`taskkill /f /t /pid ${result.pid}`)
             console.log('任务停止')
         })
+        // 开启节流，每1秒通知前端当前的进度
         result.stderr?.on('data', throttle(sendPrecent))
         result.stderr?.on('close', () => {
+            // 子进程结束时，告诉前端当前的进度为1
             win?.webContents.send('precent', {
                 filename: file,
                 precent: 1,
             })
         })
+        // 节流的回调函数
         function sendPrecent() {
+            // 告诉前端当前的进度
             win?.webContents.send('precent', {
                 filename: file,
                 precent: fs.readdirSync(img_temp_floder).length / total,
@@ -158,6 +161,7 @@ function optimizeImage(
     app: App,
     callback: typeof ImageToMp4
 ) {
+    /** 图片总数 */
     const total = formatTime(duration) * Number(fps)
 
     /** 跳转转换模型 */
@@ -166,6 +170,7 @@ function optimizeImage(
     /** 如果选择的是普通图片，则用默认模型 */
     if (options.videoType === '普通视频') model = 'realesrgan-x4plus'
 
+    // 图片转4K的bash命令
     const result = shell.exec(
         `realesrgan-ncnn-vulkan.exe -i "${img_temp_floder}" -o "${img_out_floder}" -n ${model} -s 2 -f jpg`,
         () => {
@@ -173,19 +178,23 @@ function optimizeImage(
             console.log(start('\n转4K图片已成功, 开始转4K视频'))
         }
     )
+    // 软件关闭时，结束所有子进程
     app.on('window-all-closed', () => {
         shell.exec(`taskkill /f /t /pid ${result.pid}`)
         console.log('任务停止')
     })
-
+    // 开启节流，每1秒通知前端当前的进度
     result.stderr?.on('data', throttle(sendPrecent))
     result.stderr?.on('close', () => {
+        // 告诉前端当前的进度为1
         win?.webContents.send('precent-4K', {
             filename: file,
             precent: 1,
         })
     })
+    // 节流的回调函数
     function sendPrecent() {
+        // 告诉前端当前的进度
         win?.webContents.send('precent-4K', {
             filename: file,
             precent: fs.readdirSync(img_out_floder).length / total,
@@ -211,23 +220,30 @@ function ImageToMp4(
     app: App
 ) {
     win?.webContents.send('file-mp4', { filename: file, precent: 0 })
+
+    // 合成视频的bash命令
     const result = shell.exec(
         `ffmpeg -r ${fps} -i "${img_out_floder}/frame%08d.jpg" -i "${inputFileFullPath}" -map 0:v:0 -map 1:a:0 -c:a copy -c:v hevc_nvenc -r ${fps} -pix_fmt yuv420p "${outputFileFullPath}"`,
         () => {
             shell.exec('pause')
         }
     )
+    // 软件关闭时，结束所有子进程
     app.on('window-all-closed', () => {
         shell.exec(`taskkill /f /t /pid ${result.pid}`)
         console.log('任务停止')
     })
+    // 开启节流，每1秒通知前端当前的进度
     result.stderr?.on('data', throttle(sendPrecent))
     result.stderr?.on('close', () => {
+        // 子进程结束时，告诉前端当前的进度为1
         win?.webContents.send('precent-mp4', {
             filename: file,
             precent: 1,
         })
     })
+
+    // 节流的回调函数
     function sendPrecent(data: string) {
         /** 控制台的信息 */
         const result = data.match(/(?<=time=).+(?= bitrate)/)
@@ -236,8 +252,9 @@ function ImageToMp4(
             /** 当前的进度 */
             const current = formatTime(result[0])
 
-            /** 总进度 */
+            /** 总的时长 */
             const total = formatTime(duration)
+            // 子进程结束时，告诉前端当前的进度为1
             win?.webContents.send('precent-mp4', {
                 filename: file,
                 precent: current / total,

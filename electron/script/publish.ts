@@ -1,3 +1,0 @@
-class Publish {
-    constructor() {}
-}
